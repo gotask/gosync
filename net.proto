@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package main;
+
+message FileInitInfo_CS {
+	string File = 1;
+	string Md5 = 2;
+}
+
+message FileInitInfo_SC {
+	bool Need = 1;
+}
+
+message FileConent_CS {
+	string File = 1;
+	uint32 Index = 2;
+	uint32 Total = 3;
+	bytes Content = 5;
+}
+
+message FileConent_SC {
+	uint32 Index = 1;
+}
+
+
+service SyncFile {
+  rpc FileInit(FileInitInfo_CS) returns (FileInitInfo_SC);
+  rpc FileContent(FileConent_CS) returns (FileConent_SC);
+}
