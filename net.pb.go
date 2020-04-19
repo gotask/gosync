@@ -9,8 +9,9 @@ import math "math"
 
 import (
 	"time"
-	"github.com/gotask/gpbrpc"
+
 	"github.com/gotask/gost/stnet"
+	"github.com/gotask/gpbrpc"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.

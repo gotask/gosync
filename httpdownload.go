@@ -60,7 +60,7 @@ func (h *HttpDownLoad) loadConfig() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*500)
 		defer cancel()
 		if err := Http.Start(tempD, tempA, true, false, ctx); nil != err {
-			LOG.Error("start failed %s", err.Error())
+			LOG.Error("%s start failed %s", sec, err.Error())
 			continue
 		}
 		LOG.Info("httpdownload start success %s@%s", tempD, tempA)
