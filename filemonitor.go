@@ -145,12 +145,15 @@ type Watch struct {
 }
 
 type DirConfig struct {
-	LocalDir   string
-	RemoteDir  string
-	RemoteAddr string
-	Include    string
-	Exclude    string
-	Completex  string
+	LocalDir    string
+	RemoteDir   string
+	RemoteAddr  string
+	Include     string
+	Exclude     string
+	Completex   string
+	RemoteLinux bool
+	RemoteUser  string
+	RemotePwd   string
 }
 type WatchConfig struct {
 	LoopSec uint32
@@ -275,6 +278,14 @@ func (w *Watch) loadConfig() {
 				d.Include = c.StringSection(sec, "include", "")
 				d.Exclude = c.StringSection(sec, "exclude", "")
 				d.Completex = c.StringSection(sec, "completex", "")
+
+				linux := c.StringSection(sec, "linux", "")
+				user_pwd := strings.Split(linux, "|")
+				if len(user_pwd) == 2 {
+					d.RemoteLinux = true
+					d.RemoteUser = user_pwd[0]
+					d.RemotePwd = user_pwd[1]
+				}
 			}
 		}
 		if d.LocalDir == "" {

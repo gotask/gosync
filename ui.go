@@ -9,6 +9,10 @@ import (
 	"github.com/gotask/ssui"
 )
 
+var (
+	Token string
+)
+
 func Display() error {
 	c, e := stconfig.LoadINI("sync.ini")
 	if e != nil {
@@ -27,6 +31,7 @@ dir = D:\myproject=>/home/xxx/myproject@192.168.1.111:3030
 include = .*\.(cpp|h|go)
 exclude = .*
 completex = build
+linux = user|pwd
 `)
 		c, e = stconfig.LoadINI("sync.ini")
 		if e != nil {
@@ -38,12 +43,12 @@ completex = build
 	if uiaddr == "" {
 		return nil
 	}
-	token := c.StringSection("system", "token", "")
+	Token = c.StringSection("system", "token", "")
 
 	var app *ssui.HApp
 	router := "/"
-	if token != "" {
-		app = ssui.NewAdminApp(uiaddr, "gosync", token)
+	if Token != "" {
+		app = ssui.NewAdminApp(uiaddr, "gosync", Token)
 		router = "/config"
 	} else {
 		app = ssui.NewApp(uiaddr)
@@ -122,7 +127,7 @@ completex = build
 		c.Save()
 		return ssui.ResponseError("保存成功，重启生效")
 	})))
-	f.AddElem(ssui.NewToolTable("sync", false, []string{"ID(格式不能变)", "同步地址", "Include", "Exclude", "CompleteExclude"}, func(user string, page, limit int, searchtxt string) (total int, data [][]string) {
+	f.AddElem(ssui.NewToolTable("sync", false, []string{"ID(格式不能变)", "同步地址", "Include", "Exclude", "CompleteExclude", "Linux(user|pwd)"}, func(user string, page, limit int, searchtxt string) (total int, data [][]string) {
 		c, e := stconfig.LoadINI("sync.ini")
 		if e != nil {
 			return 0, nil
@@ -137,11 +142,12 @@ completex = build
 			in := c.StringSection(sec, "include", "")
 			ex := c.StringSection(sec, "exclude", "")
 			cex := c.StringSection(sec, "completex", "")
-			data = append(data, []string{sec, di, in, ex, cex})
+			lin := c.StringSection(sec, "linux", "")
+			data = append(data, []string{sec, di, in, ex, cex, lin})
 		}
 		return len(data), data
 	}, func(user string, t ssui.TableOperType, cols []string) ssui.ApiRsp {
-		if len(cols) != 5 {
+		if len(cols) != 6 {
 			return ssui.ApiRsp{1, "error param"}
 		}
 		if t == ssui.TOEdit || t == ssui.TOAdd {
@@ -156,6 +162,7 @@ completex = build
 			c.SectionSet(cols[0], "include", cols[2], "")
 			c.SectionSet(cols[0], "exclude", cols[3], "")
 			c.SectionSet(cols[0], "completex", cols[4], "")
+			c.SectionSet(cols[0], "linux", cols[5], "")
 			c.Save()
 		} else if t == ssui.TODel {
 			c, e := stconfig.LoadINI("sync.ini")
@@ -184,18 +191,17 @@ completex = build
 	}))
 	f.AddElem(ssui.NewText("code", ""))
 
-	if token != "" {
+	if Token != "" {
 		gp := ssui.NewPageGroup("Config", "layui-icon layui-icon-set-fill")
 		gp.AddFrame(f)
 		app.AddPageGroup(gp)
 	} else {
 		app.AddFrame(f)
 	}
+	LOG.Info("ui start at: %s", uiaddr)
 	err := app.Run()
 	if err != nil {
 		LOG.Error("ui start error: %s", err.Error())
-	} else {
-		LOG.Info("ui start success: %s", uiaddr)
 	}
 	return err
 }

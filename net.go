@@ -4,9 +4,9 @@ package main
 import (
 	"strings"
 
-	. "github.com/gotask/gost/stnet"
 	"github.com/gotask/gost/stutil"
 	"github.com/gotask/gpbrpc"
+	"golang.org/x/crypto/ssh"
 )
 
 var (
@@ -18,15 +18,15 @@ var (
 func NetStart(w *Watch) error {
 	LOG.Info("listen@%s", w.Conf.Address)
 	SVR = gpbrpc.NewGpbServer("sync-server", 100)
-	_, e := SVR.AddGpbService("loop", "", 0, &SyncServer{}, 0)
+	_, e := SVR.AddLoopService("loop", &SyncServer{}, 0)
 	if e != nil {
 		return e
 	}
-	e = SVR.AddRpcService("server", w.Conf.Address, 0, NewSyncFileServer(&SyncFileImp{}), 0)
+	e = SVR.AddRpcService("server", w.Conf.Address, 0, NewSyncFileService(&SyncFileImp{}), 0)
 	if e != nil {
 		return e
 	}
-	e = SVR.AddRpcClient("rpcclient", 0)
+	e = SVR.AddRpcClient("rpcclient", nil, 0)
 	if e != nil {
 		return e
 	}
@@ -36,10 +36,21 @@ func NetStart(w *Watch) error {
 
 type SyncConn struct {
 	conn   *SyncFileClient
+	sshc   *ssh.Client
 	ev     *SyncEvent
 	ok     bool
 	failed bool
 }
+
+func (c *SyncConn) Close() {
+	if c.conn != nil {
+		c.conn.GetConn().Close()
+	}
+	if c.sshc != nil {
+		c.sshc.Close()
+	}
+}
+
 type SyncEvent struct {
 	Event
 	ProcessNum int
@@ -91,13 +102,13 @@ func (s *SyncServer) Loop() {
 					delete(s.Ev, k)
 				}
 			} else {
-				LOG.Error("no key %s", k)
+				LOG.Error("no key %s ", k)
 			}
-			v.conn.GetConn().Close()
+			v.Close()
 			delete(s.Conns, k)
 		} else if v.failed {
 			LOG.Debug("sync failed %s", k)
-			v.conn.GetConn().Close()
+			v.Close()
 			delete(s.Conns, k)
 		}
 	}
@@ -109,62 +120,118 @@ func (s *SyncServer) Loop() {
 		}
 		if _, ok := s.Conns[k]; !ok {
 
-			info := &SyncConn{NewSyncFileClient(), v, false, false}
-			s.Conns[k] = info
-			go func(k string, v *SyncEvent) {
-				v.ProcessNum++
-				SVR.NewRpcConnector("rpcclient", v.Conf.RemoteAddr, info.conn)
+			if v.Conf.RemoteLinux {
+				remotePath := strings.Replace(v.Path, v.Conf.LocalDir, v.Conf.RemoteDir, -1)
+				remotePath = strings.Replace(remotePath, "\\", "/", -1)
+				di := strings.LastIndex(remotePath, "/")
+				remoteDir := remotePath[0:di]
 
-				f := strings.Replace(v.Path, v.Conf.LocalDir, v.Conf.RemoteDir, -1)
-				md5 := ""
-				var e error
-				if v.Op != Delete {
-					md5, e = stutil.FileMD5(v.Path)
-					if e != nil {
-						info.failed = true
-						LOG.Error("md5 read failed %s %s %s", k, e.Error(), v.Op)
-						return
-					}
-				}
-				r, i := info.conn.FileInit_Sync(&FileInitInfo_CS{File: f, Md5: md5})
-				if i != 0 {
-					info.failed = true
-					LOG.Error("FileInit_Sync failed %s %d", k, i)
-					return
-				}
-				if !r.Need {
-					info.ok = true
-					//LOG.Error("FileInit_Sync same md5 %s %d", k, i)
-					if v.Op != Init {
-						LOG.Info("FileInit_Sync success %s", k)
-					}
-					return
-				}
-				b, e := stutil.FileReadAll(v.Path)
+				c, e := stutil.SSHNew(v.Conf.RemoteUser, v.Conf.RemotePwd, v.Conf.RemoteAddr)
+				info := &SyncConn{nil, c, v, false, false}
+				s.Conns[k] = info
 				if e != nil {
 					info.failed = true
-					LOG.Error("FileInit_Sync readfile failed %s %s", k, e.Error())
-					return
+					v.ProcessNum++
+					LOG.Error("SSHNew failed %s %s", k, e.Error())
+				} else {
+					go func(k string, v *SyncEvent) {
+						defer func() {
+							v.ProcessNum++
+						}()
+						if v.Op == Delete {
+							stutil.SSHExeCmd(info.sshc, "rm "+remotePath)
+							info.ok = true
+							return
+						} else if v.Op == Init {
+							md5, _ := stutil.FileMD5(v.Path)
+							md3, _ := stutil.SSHExeCmd(info.sshc, "md5sum "+remotePath)
+							if md5 == "" || strings.HasPrefix(md3, md5) {
+								info.ok = true
+								return
+							}
+						}
+
+						e := stutil.SSHScp2Remote(info.sshc, v.Path, remotePath, nil)
+						if e != nil {
+							info.failed = true
+							LOG.Error("SSHScp2Remote failed %s %s %s", v.Path, remotePath, e.Error())
+
+							//mkdir
+							stutil.SSHExeCmd(info.sshc, "mkdir -p "+remoteDir)
+						} else {
+							info.ok = true
+							LOG.Info("scp success %s %s", v.Path, remotePath)
+						}
+					}(k, v)
 				}
-				var n uint32
-				t := uint32(len(b))
-				for ; n < t; n += NET_LEN {
-					fend := n + NET_LEN
-					if fend > t {
-						fend = t
+			} else {
+				info := &SyncConn{NewSyncFileClient(), nil, v, false, false}
+				s.Conns[k] = info
+				go func(k string, v *SyncEvent) {
+					defer func() {
+						v.ProcessNum++
+					}()
+					SVR.NewRpcConnector("rpcclient", v.Conf.RemoteAddr, info.conn)
+					if Token != "" {
+						r, i := info.conn.Connect_Sync(&Connect_CS{Token: Token})
+						if r == nil || r.GetToken() == "" || i != 0 {
+							info.failed = true
+							LOG.Error("Connect_Sync failed %s %d", k, i)
+							return
+						}
 					}
-					_, i := info.conn.FileContent_Sync(&FileConent_CS{File: f, Index: n, Total: t, Content: b[n:fend]})
+
+					f := strings.Replace(v.Path, v.Conf.LocalDir, v.Conf.RemoteDir, -1)
+					md5 := ""
+					var e error
+					if v.Op != Delete {
+						md5, e = stutil.FileMD5(v.Path)
+						if e != nil {
+							info.failed = true
+							LOG.Error("md5 read failed %s %s %s", k, e.Error(), v.Op)
+							return
+						}
+					}
+					r, i := info.conn.FileInit_Sync(&FileInitInfo_CS{File: f, Md5: md5})
 					if i != 0 {
 						info.failed = true
-						LOG.Error("FileContent_Sync failed %s %d", k, i)
+						LOG.Error("FileInit_Sync failed %s %d", k, i)
 						return
-					} else {
-						//LOG.Info("sync ok %s index %d total %d", k, r.Index, t)
 					}
-				}
-				info.ok = true
-				LOG.Info("FileContent_Sync success %s", k)
-			}(k, v)
+					if !r.Need {
+						info.ok = true
+						//LOG.Error("FileInit_Sync same md5 %s %d", k, i)
+						if v.Op != Init {
+							LOG.Info("FileInit_Sync success %s", k)
+						}
+						return
+					}
+					b, e := stutil.FileReadAll(v.Path)
+					if e != nil {
+						info.failed = true
+						LOG.Error("FileInit_Sync readfile failed %s %s", k, e.Error())
+						return
+					}
+					var n uint32
+					t := uint32(len(b))
+					for ; n < t; n += NET_LEN {
+						fend := n + NET_LEN
+						if fend > t {
+							fend = t
+						}
+						_, i := info.conn.FileContent_Sync(&FileConent_CS{File: f, Index: n, Total: t, Content: b[n:fend]})
+						if i != 0 {
+							info.failed = true
+							LOG.Error("FileContent_Sync failed %s %d", k, i)
+							return
+						} else {
+							//LOG.Info("sync ok %s index %d total %d", k, r.Index, t)
+						}
+					}
+					info.ok = true
+					LOG.Info("FileContent_Sync success %s", k)
+				}(k, v)
+			}
 
 		}
 	}
@@ -173,18 +240,4 @@ func (s *SyncServer) Loop() {
 	if oldEvLen != newEvLen && newEvLen == 0 {
 		LOG.Info("sync complete!!!!!!")
 	}
-}
-func (s *SyncServer) Destroy() {
-
-}
-func (s *SyncServer) HandleMessage(current *CurrentContent, msg *gpbrpc.ProtocolRequest) {
-}
-func (s *SyncServer) HashProcessor(sess *Session, msg *gpbrpc.ProtocolRequest) (processorID int) {
-	return int(sess.GetID() % uint64(ProcessorThreadsNum))
-}
-func (s *SyncServer) SessionOpen(sess *Session) {
-
-}
-func (s *SyncServer) SessionClose(sess *Session) {
-
 }

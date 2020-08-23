@@ -1,5 +1,10 @@
 # gosync
 a tool for sync ro download files
+
+# build
+windows 
+go build -ldflags="-H windowsgui"
+
 # default config
 ```
 [system]
@@ -19,4 +24,4 @@ exclude = .*
 completex = build #ignore file or dir
 ```
 # config
-![config](https://github.com/gotask/images/blob/master/gosync.jpg)
+![config](https://github.com/gotask/images/blob/master/gosync.jpg?raw=true)

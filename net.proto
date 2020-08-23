@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package main;
 
+message Connect_CS {
+	string Token = 1;
+}
+
 message FileInitInfo_CS {
 	string File = 1;
 	string Md5 = 2;
@@ -24,6 +28,7 @@ message FileConent_SC {
 
 
 service SyncFile {
+  rpc Connect(Connect_CS) returns (Connect_CS);
   rpc FileInit(FileInitInfo_CS) returns (FileInitInfo_SC);
   rpc FileContent(FileConent_CS) returns (FileConent_SC);
 }
