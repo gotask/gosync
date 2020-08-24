@@ -219,11 +219,15 @@ func (w *Watch) Reload(force bool) {
 func (w *Watch) AddWatch(conf DirConfig) error {
 	var include, exclude *regexp.Regexp
 	var err error
+	var comp []string
 	if conf.Include != "" {
 		include, err = regexp.Compile(conf.Include)
 	}
 	if conf.Exclude != "" {
 		exclude, err = regexp.Compile(conf.Exclude)
+	}
+	if conf.Completex != "" {
+		comp = strings.Split(conf.Completex, "|")
 	}
 	if err != nil {
 		LOG.Error("addwatch error %v %s", conf, err.Error())
@@ -237,10 +241,10 @@ func (w *Watch) AddWatch(conf DirConfig) error {
 	if e, ok := w.elems[conf.LocalDir]; ok {
 		e.Include = include
 		e.Exclude = exclude
-		e.Completex = strings.Split(conf.Completex, "|")
+		e.Completex = comp
 		e.Conf = conf
 	} else {
-		w.elems[conf.LocalDir] = &WatchDir{conf.LocalDir, include, exclude, strings.Split(conf.Completex, "|"), nil, conf}
+		w.elems[conf.LocalDir] = &WatchDir{conf.LocalDir, include, exclude, comp, nil, conf}
 	}
 	return nil
 }
@@ -278,6 +282,10 @@ func (w *Watch) loadConfig() {
 				d.Include = c.StringSection(sec, "include", "")
 				d.Exclude = c.StringSection(sec, "exclude", "")
 				d.Completex = c.StringSection(sec, "completex", "")
+
+				d.Include = strings.TrimSpace(d.Include)
+				d.Exclude = strings.TrimSpace(d.Exclude)
+				d.Completex = strings.TrimSpace(d.Completex)
 
 				linux := c.StringSection(sec, "linux", "")
 				user_pwd := strings.Split(linux, "|")
