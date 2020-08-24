@@ -6,5 +6,5 @@ import (
 )
 
 func deamon(title, info string) {
-	stutil.SysDeamon()
+	stutil.SysDaemon()
 }
