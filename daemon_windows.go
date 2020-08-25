@@ -8,9 +8,8 @@ package main
 
 import (
 	"log"
-)
+	"syscall"
 
-import (
 	"github.com/lxn/walk"
 )
 
@@ -80,4 +79,6 @@ func deamon(title, info string) {
 
 	// Run the message loop.
 	mw.Run()
+
+	EXIT <- syscall.SIGKILL
 }

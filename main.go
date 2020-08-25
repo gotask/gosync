@@ -2,8 +2,15 @@
 package main
 
 import (
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/gotask/gost/stconfig"
-	"github.com/gotask/gost/stutil"
+)
+
+var (
+	EXIT = make(chan os.Signal, 1)
 )
 
 func main() {
@@ -24,7 +31,12 @@ func main() {
 	}
 	w.Start()
 
-	stutil.SysWaitSignal()
+	signal.Notify(EXIT, syscall.SIGINT, syscall.SIGTERM)
+	signal.Ignore(syscall.SIGPIPE)
+
+	select {
+	case <-EXIT:
+	}
 
 	SVR.Stop()
 }
