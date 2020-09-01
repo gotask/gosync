@@ -22,7 +22,8 @@ func deamon(title, info string) {
 	}
 
 	// We load our icon from a file.
-	icon, err := walk.Resources.Icon("logo.ico")
+	icon, err := walk.NewIconFromResourceId(3)
+	//icon, err := walk.Resources.Icon("logo.ico")
 	if err != nil {
 		log.Fatal(err)
 	}

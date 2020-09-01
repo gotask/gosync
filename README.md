@@ -3,6 +3,8 @@ a tool for sync ro download files
 
 # build
 windows 
+go get github.com/akavel/rsrc
+./rsrc.exe -manifest gosync.manifest -ico logo.ico
 go build -ldflags="-H windowsgui"
 
 # default config

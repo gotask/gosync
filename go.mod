@@ -5,7 +5,7 @@ require (
 	github.com/gotask/gohttpserver v0.0.0-20200204124901-0502da3b918e
 	github.com/gotask/gost v1.0.0
 	github.com/gotask/gpbrpc v0.0.0-20200824040241-c2b0bf735d7a
-	github.com/gotask/ssui v0.0.0-20200818133221-ed70e83737a4
+	github.com/gotask/ssui master
 	github.com/lxn/walk v0.0.0-20200806153934-8721e9bc9ff7
 	github.com/lxn/win v0.0.0-20191128105842-2da648fda5b4
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
