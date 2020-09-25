@@ -53,12 +53,15 @@ func allFiles(path string, include, exclude *regexp.Regexp, completex []string) 
 	fileList := make(map[string]os.FileInfo)
 	stutil.FileReadDir(path, true, fileList)
 
+	for k, v := range fileList {
+		if v.IsDir() {
+			delete(fileList, k)
+			continue
+		}
+	}
+
 	if include != nil || exclude != nil || len(completex) > 0 {
-		for k, v := range fileList {
-			if v.IsDir() {
-				delete(fileList, k)
-				continue
-			}
+		for k, _ := range fileList {
 			if len(completex) > 0 {
 				con := false
 				for _, c := range completex {
