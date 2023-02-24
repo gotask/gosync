@@ -7,9 +7,9 @@ require (
 	github.com/gotask/gpbrpc v0.0.0-20200824040241-c2b0bf735d7a
 	github.com/gotask/ssui v0.0.0-20200901114130-b4912b37a0bf
 	github.com/lxn/walk v0.0.0-20200806153934-8721e9bc9ff7
-	github.com/lxn/win v0.0.0-20191128105842-2da648fda5b4
-	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
-	golang.org/x/tools v0.0.0-20200823205832-c024452afbcd // indirect
+	github.com/lxn/win v0.0.0-20191128105842-2da648fda5b4 // indirect
+	github.com/smartystreets/goconvey v1.7.2 // indirect
+	golang.org/x/crypto v0.1.0
 	gopkg.in/Knetic/govaluate.v3 v3.0.0 // indirect
 	howett.net/plist v0.0.0-20200419221736-3b63eb3a43b5 // indirect
 )
